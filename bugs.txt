@@ -1,0 +1,210 @@
+//create a schema validation to save the connection request between two users
+connectionRequestSchema.pre('save', function () {
+    const connectionRequest = this;
+    //now check if the fromUserId is equal to toUserId
+    if (connectionRequest.fromUserId.equals(connectionRequest.toUserId)) {
+        throw new Error("User cannot send a request to himself");
+    }
+    // next(); //
+});
+
+-> it was giving me error saying next() is not a function.
+middleware in Mongoose typically uses next() — but the key detail is what kind of middleware you’re writing.
+🔎 Two styles of pre('save') middleware
+- Synchronous middleware :
+In synchronous middleware, you don’t use next(). Instead, you just throw an error if validation fails,here in case 
+of pre(save) middleware can be synchronous or asynchronous,Here, you throw an error directly (which is fine),
+but then you call next() afterward. If Mongoose interprets this middleware as synchronous, it doesn’t pass next 
+at all → hence next is undefined.
+
+
+
+2.  Another bug i got => when i am doing 
+```js
+const requestId = req.params.requestId;
+const status = req.params.status;
+```
+it was giving me error saying requestId is not a valid id
+so i changed it to  const { requestId, status } = req.params; This is called object destructuring.
+Both are same but the second one is more readable.
+
+# The Real Cause :
+- In your earlier snippet you had:
+const requestId = req.params;
+const status = req.params;
+- That assigns the whole object ({ status: "...", requestId: "..." }) to both variables.
+Later, when you try to use status in allowedStatus.includes(status), you’re comparing an object against strings → Cannot convert object to primitive value
+- With destructuring:
+const { status, requestId } = req.params;
+- You correctly extract the individual string values, so no error.
+
+Lets see the difference between the two:
+
+Example Setup
+Imagine Express gives you this req.params object:
+req.params = {
+  status: "accepted",
+  requestId: "abc123"
+};
+
+Perfect, Sudeshna — let’s walk through this with a **concrete runnable example** so you can see exactly why the error happens when you assign the whole object instead of its properties.
+
+---
+
+## 🧩 Example Setup
+Imagine Express gives you this `req.params` object:
+
+```js
+req.params = {
+  status: "accepted",
+  requestId: "abc123"
+};
+```
+
+---
+
+### ❌ Wrong Way (assigning the whole object)
+```js
+const requestId = req.params;   // requestId = { status: "accepted", requestId: "abc123" }
+const status = req.params;      // status = { status: "accepted", requestId: "abc123" }
+
+const allowedStatus = ["accepted", "rejected"];
+
+console.log(allowedStatus.includes(status)); 
+```
+
+- Here `status` is **not** the string `"accepted"`.  
+- It’s the **entire object**: `{ status: "accepted", requestId: "abc123" }`.  
+- When JavaScript tries to compare that object to `"accepted"`, it throws:
+
+```
+TypeError: Cannot convert object to primitive value
+```
+
+---
+
+### ✅ Correct Way (direct property access)
+```js
+const requestId = req.params.requestId;  // "abc123"
+const status = req.params.status;        // "accepted"
+
+const allowedStatus = ["accepted", "rejected"];
+
+console.log(allowedStatus.includes(status)); 
+// true
+```
+
+Now `status` is a string, so `includes` works fine.
+
+---
+
+### ✅ Correct Way (destructuring)
+```js
+const { status, requestId } = req.params;
+
+const allowedStatus = ["accepted", "rejected"];
+
+console.log(allowedStatus.includes(status)); 
+// true
+```
+
+This is just shorthand for the direct property access above.
+
+---
+
+## 🔎 Key Takeaway
+- `const requestId = req.params;` → assigns the **whole object**.  
+- `const requestId = req.params.requestId;` → assigns the **string value**.  
+- `const { requestId } = req.params;` → same as above, but cleaner.
+
+---
+
+let’s do a **step‑by‑step dry run in memory** so you can *see* how JavaScript is storing values in each case.  
+
+## Setup
+Imagine Express gives you:
+
+```js
+req.params = {
+  status: "accepted",
+  requestId: "abc123"
+};
+```
+
+---
+
+### ❌ Wrong assignment (whole object)
+```js
+const requestId = req.params;
+const status = req.params;
+```
+
+**Timeline of values:**
+1. `req.params` = `{ status: "accepted", requestId: "abc123" }`
+2. `requestId` = `{ status: "accepted", requestId: "abc123" }`  
+   (not the string `"abc123"`, but the whole object)
+3. `status` = `{ status: "accepted", requestId: "abc123" }`  
+   (not the string `"accepted"`, but the whole object)
+4. Later:  
+   ```js
+   allowedStatus.includes(status)
+   ```
+   → `allowedStatus = ["accepted", "rejected"]`  
+   → comparing `["accepted","rejected"].includes({ status: "accepted", requestId: "abc123" })`  
+   → JavaScript tries to convert the object to a primitive string → fails →  
+   **Error: Cannot convert object to primitive value**
+
+---
+
+### ✅ Correct direct property access
+```js
+const requestId = req.params.requestId;
+const status = req.params.status;
+```
+
+**Timeline of values:**
+1. `req.params` = `{ status: "accepted", requestId: "abc123" }`
+2. `requestId` = `"abc123"`
+3. `status` = `"accepted"`
+4. Later:  
+   ```js
+   allowedStatus.includes(status)
+   ```
+   → `["accepted","rejected"].includes("accepted")`  
+   → returns `true` ✅
+
+---
+
+### ✅ Correct destructuring
+```js
+const { status, requestId } = req.params;
+```
+
+**Timeline of values:**
+1. `req.params` = `{ status: "accepted", requestId: "abc123" }`
+2. `status` = `"accepted"`
+3. `requestId` = `"abc123"`
+4. Later:  
+   ```js
+   allowedStatus.includes(status)
+   ```
+   → `["accepted","rejected"].includes("accepted")`  
+   → returns `true` ✅
+
+---
+
+## 🔎 Key Insight
+- `const requestId = req.params;` → whole object, not usable in string checks.  
+- `const requestId = req.params.requestId;` → actual string value.  
+- `const { requestId } = req.params;` → shorthand for the same thing.  
+
+---
+
+
+
+
+
+
+
+
+
