@@ -1,11 +1,12 @@
 ## TechMates
 
+- Create a `config` folder and add a `db.js` file.
+- Install `dotenv` and `mongoose`.
 
+## Models
 
-- create config folder and create db.js file
-- install dotenv and mongoose
-
-
-# models
-- used validator package for validation, install npm i validator, This library validates and sanitizes strings only.
-- 
+- Use the `validator` package for validation:
+  ```bash
+  npm install validator
+  ```
+- The `validator` library validates and sanitizes strings.
